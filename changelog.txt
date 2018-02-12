@@ -1,10 +1,24 @@
-Version 0.1.37 ()
+Version 0.1.39 (2018-02-09)
+- Fixed exception when "resolvenames" not set @danielperna84
+- Cleaning up JSON as workaround for CCU bug @danielperna84
+- Added virtual CCU and some tests @danielperna84
+- Added HmIP-SRH @pascalhahn
+- Added HM-LC-Dim1T-Pl-2 @krawadl
+
+Version 0.1.38 (2018-01-26)
+- KeyMatic improvements @PH89
+- Fix skipping remotes @danielperna84
+- Added lowercase variants for some IP-devices (Issue #110) @danielperna84
+
+Version 0.1.37 (2018-01-11)
 - Allow skipping remotes @pvizeli
 - Fix HmIP-dTRV-2 @daenny
 - Added HMIP-WC6 @rexyiy
 - Added HmIP-BBL @steffenslavetinsky
 - Added REV-Ritter-Switch @widder
 - Added HmIP-BROLL @steffenslavetinsky
+- Added tilt-support @steffenslavetinsky
+- Added HmIP-SMO @mcdeck
 
 Version 0.1.36 (2017-12-15)
 - Added HMIP-WTH @ch-world

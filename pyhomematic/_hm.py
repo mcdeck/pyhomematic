@@ -149,7 +149,7 @@ class RPCFunctions(object):
                 except Exception as err:
                     LOG.critical(
                         "RPCFunctions.createDeviceObjects: Child: %s", str(err))
-        if self.devices_all[remote] and self.remotes[remote]['resolvenames']:
+        if self.devices_all[remote] and self.remotes[remote].get('resolvenames', False):
             self.addDeviceNames(remote)
         working = False
         if self.systemcallback:
@@ -272,7 +272,11 @@ class RPCFunctions(object):
             req = urllib.request.Request(apiendpoint, payload, headers)
             resp = urllib.request.urlopen(req)
             if resp.status == 200:
-                return json.loads(resp.read().decode('utf-8').replace('$\\{','$\\\\{'))
+                try:
+                    return json.loads(resp.read().decode('utf-8'))
+                except ValueError as err:
+                    # Workaround for bug in CCU
+                    return json.loads(resp.read().decode('utf-8').replace("\\", ""))
             else:
                 LOG.error("RPCFunctions.jsonRpcPost: Status: %i" % resp.status)
                 return {'error': resp.status, 'result': {}}
@@ -390,6 +394,7 @@ class LockingServerProxy(xmlrpc.client.ServerProxy):
         """
         Initialize new proxy for server and get local ip
         """
+        self._skipinit = kwargs.pop("skipinit", False)
         self._callbackip = kwargs.pop("callbackip", None)
         self._callbackport = kwargs.pop("callbackport", None)
         self.lock = threading.Lock()
@@ -458,9 +463,6 @@ class ServerThread(threading.Thread):
         # Create proxies to interact with CCU / Homegear
         LOG.debug("__init__: Creating proxies")
         for remote, host in self.remotes.items():
-            if not host.get('connect'):
-                continue
-
             # Initialize XML-RPC
             try:
                 socket.inet_pton(socket.AF_INET, host['ip'])
@@ -475,7 +477,8 @@ class ServerThread(threading.Thread):
             try:
                 self.proxies[host['id']] = LockingServerProxy("http://%s:%i%s" % (host['ip'], host['port'], host['path']),
                                                               callbackip=host.get('callbackip', None),
-                                                              callbackport=host.get('callbackport', None))
+                                                              callbackport=host.get('callbackport', None),
+                                                              skipinit=not host.get('connect', True))
             except Exception as err:
                 LOG.warning("Failed connecting to proxy at http://%s:%i%s" %
                             (host['ip'], host['port'], host['path']))
@@ -528,6 +531,8 @@ class ServerThread(threading.Thread):
         # Call init() with local XML RPC config and interface_id (the name of
         # the receiver) to receive events. XML RPC server has to be running.
         for interface_id, proxy in self.proxies.items():
+            if proxy._skipinit:
+                continue
             if proxy._callbackip and proxy._callbackport:
                 callbackip = proxy._callbackip
                 callbackport = proxy._callbackport

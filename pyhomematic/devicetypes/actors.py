@@ -2,7 +2,7 @@ import logging
 from pyhomematic.devicetypes.generic import HMDevice
 from pyhomematic.devicetypes.sensors import HMSensor
 from pyhomematic.devicetypes.helper import (
-    HelperWorking, HelperActorState, HelperActorLevel, HelperActionOnTime,
+    HelperWorking, HelperActorState, HelperActorLevel, HelperActorBlindTilt, HelperActionOnTime,
     HelperActionPress, HelperEventRemote, HelperWired)
 
 LOG = logging.getLogger(__name__)
@@ -58,11 +58,26 @@ class KeyBlind(Blind, HelperActionPress, HelperWired):
 
     @property
     def ELEMENT(self):
-        if "HmIP-BBL" in self.TYPE:
-            return [4]
-        elif "HmIP-BROLL" in self.TYPE:
-            return [4]
         return [3]
+
+class IPKeyBlind(KeyBlind):
+    """
+    Blind switch that raises and lowers homematic ip roller shutters or window blinds.
+    """
+
+    @property
+    def ELEMENT(self):
+        return [4]
+
+class IPKeyBlindTilt(IPKeyBlind, HelperActorBlindTilt):
+
+    def close_slats(self, channel=None):
+        """Move the shutter up all the way."""
+        self.set_cover_tilt_position(0.0, channel)
+
+    def open_slats(self, channel=None):
+        """Move the shutter down all the way."""
+        self.set_cover_tilt_position(1.0, channel)
 
 
 class GenericDimmer(HMActor, HelperActorLevel):
@@ -270,9 +285,9 @@ class RFSiren(GenericSwitch, HelperWorking):
         return [1, 2, 3]
 
 
-class KeyMatic(GenericSwitch):
+class KeyMatic(HMActor, HelperActorState):
     """
-    Open or close KeyMatic.
+    Lock, Unlock or Open KeyMatic.
     """
     def __init__(self, device_description, proxy, resolveparamsets=False):
         super().__init__(device_description, proxy, resolveparamsets)
@@ -281,6 +296,30 @@ class KeyMatic(GenericSwitch):
         self.ACTIONNODE.update({"OPEN": self.ELEMENT})
         self.BINARYNODE.update({"STATE_UNCERTAIN": self.ELEMENT})
         self.SENSORNODE.update({"ERROR": self.ELEMENT})
+
+    def is_unlocked(self, channel=None):
+        """ Returns True if KeyMatic is unlocked. """
+        return self.get_state(channel)
+
+    def is_locked(self, channel=None):
+        """ Returns True if KeyMatic is locked. """
+        return not self.get_state(channel)
+
+    def unlock(self, channel=None):
+        """Unlocks the door lock."""
+        return self.set_state(True, channel)
+
+    def lock(self, channel=None):
+        """Locks the door lock"""
+        return self.set_state(False, channel)
+
+    def open(self):
+        """Opens the door.
+           Keep in mind that in most cases the door can only be closed physically.
+           If the KeyMatic is in locked state it will unlock first.
+           After opening the door the state of KeyMatic is unlocked.
+        """
+        return self.setValue("OPEN", True)
 
     @property
     def ELEMENT(self):
@@ -348,7 +387,7 @@ class IPSwitchPowermeter(IPSwitch, HMSensor):
         sensorIndex = None
         if "HmIP-FSM" in self.TYPE:
             sensorIndex = 5
-        elif "HMIP-PSM" in self.TYPE or "HmIP-PSM-CH" in self.TYPE:
+        elif "HMIP-PSM" in self.TYPE or "HmIP-PSM" in self.TYPE or "HmIP-PSM-CH" in self.TYPE:
             sensorIndex = 6
         elif "HmIP-BSM" in self.TYPE:
             sensorIndex = 7
@@ -374,14 +413,15 @@ DEVICETYPES = {
     "263 147": Blind,
     "HM-LC-BlX": Blind,
     "HM-Sec-Win": Blind,
-    "HmIP-BROLL": KeyBlind,
-    "HmIP-BBL": KeyBlind,
+    "HmIP-BROLL": IPKeyBlind,
+    "HmIP-BBL": IPKeyBlindTilt,
     "HM-LC-Dim1L-Pl": Dimmer,
     "HM-LC-Dim1L-Pl-2": Dimmer,
     "HM-LC-Dim1L-Pl-3": Dimmer,
     "HM-LC-Dim1L-CV": Dimmer,
     "HM-LC-Dim1L-CV-2": Dimmer,
     "HM-LC-Dim1T-Pl": Dimmer,
+    "HM-LC-Dim1T-Pl-2": Dimmer,
     "HM-LC-Dim1T-Pl-3": Dimmer,
     "HM-LC-Dim1T-CV": Dimmer,
     "HM-LC-Dim1T-CV-2": Dimmer,
@@ -472,12 +512,14 @@ DEVICETYPES = {
     "HMW-LC-Bl1-DR-2": KeyBlind,
     "HMW-LC-Dim1L-DR": KeyDimmer,
     "HMIP-PS": IPSwitch,
+    "HmIP-PS": IPSwitch,
     "HMIP-PSM": IPSwitchPowermeter,
+    "HmIP-PSM": IPSwitchPowermeter,
     "HmIP-PSM-CH": IPSwitchPowermeter,
     "HmIP-FSM": IPSwitchPowermeter,
     "HmIP-BSM": IPSwitchPowermeter,
     "HMIP-BDT": IPKeyDimmer,
-    "HmIP-BDT": IPKeyDimmer, # Version above did not work, keeping it though, just in case
+    "HmIP-BDT": IPKeyDimmer,
     "HM-Sec-Key": KeyMatic,
     "HM-Sec-Key-S": KeyMatic,
     "HM-Sec-Key-O": KeyMatic,
